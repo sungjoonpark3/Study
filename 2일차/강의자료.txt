@@ -1,0 +1,323 @@
+일단, 컴포넌트가 브라우저에 나타나기 전, 후에 호출되는 API 들이 있습니다.
+
+constructor
+constructor(props) {
+  super(props);
+}
+이전에 언급 한적이 있죠? 이 부분은 컴포넌트 생성자 함수입니다. 컴포넌트가 새로 만들어질 때마다 이 함수가 호출됩니다.
+
+componentWillMount
+componentWillMount() {
+
+}
+이 API 는 컴포넌트가 여러분의 화면에 나가나기 직전에 호출되는 API 인데요, 이 API 에 대해선 별로 신경쓰지 않아도 됩니다. 원래는 주로 브라우저가 아닌 환경에서 (서버사이드)도 호출하는 용도로 사용했었는데, 이 API 가 더 이상 필요하지 않게 되어 리액트 v16.3 에서는 해당 API 가 deprecated 되었으니, 아, 옛날엔 이러한 API가 사용됐었구나.. 하고 알아만 두시면 됩니다. v16.3 이후부터는 UNSAFE_componentWillMount() 라는 이름으로 사용됩니다. 기존에 이 API 에서 하던 것들은 위에 있는 constructor 와 아래에서 다뤄볼 componentDidMount 에서 충분히 처리 할 수 있습니다.
+
+componentDidMount
+componentDidMount() {
+  // 외부 라이브러리 연동: D3, masonry, etc
+  // 컴포넌트에서 필요한 데이터 요청: Ajax, GraphQL, etc
+  // DOM 에 관련된 작업: 스크롤 설정, 크기 읽어오기 등
+}
+이 API 는 여러분의 컴포넌트가 화면에 나타나게 됐을 때 호출됩니다. 여기선 주로 D3, masonry 처럼 DOM 을 사용해야하는 외부 라이브러리 연동을 하거나, 해당 컴포넌트에서 필요로하는 데이터를 요청하기 위해 axios, fetch 등을 통하여 ajax 요청을 하거나, DOM 의 속성을 읽거나 직접 변경하는 작업을 진행합니다.
+
+컴포넌트 업데이트
+컴포넌트가 업데이트는 props 의 변화, 그리고 state 의 변화에 따라 결정됩니다. 업데이트가 되기 전과 그리고 된 후에 어떠한 API 가 호출 되는지 살펴볼까요?
+
+componentWillReceiveProps
+componentWillReceiveProps(nextProps) {
+  // this.props 는 아직 바뀌지 않은 상태
+}
+이 API 는 컴포넌트가 새로운 props 를 받게됐을 때 호출됩니다. 이 안에서는 주로, state 가 props 에 따라 변해야 하는 로직을 작성합니다. 새로 받게될 props 는 nextProps 로 조회 할 수 있으며, 이 때 this.props 를 조회하면 업데이트 되기 전의 API 이니 참고하세요. 이 API 또한 v16.3 부터 deprecate 됩니다. v16.3 부터는 UNSAFE_componentWillReceiveProps() 라는 이름으로 사용됩니다. 그리고, 이 기능은 상황에 따라 새로운 API getDerivedStateFromProps 로 대체 될 수도 있습니다.
+
+[NEW] static getDerivedStateFromProps()
+이 함수는, v16.3 이후에 만들어진 라이프사이클 API 인데요, 이 API 는 props 로 받아온 값을 state 로 동기화 하는 작업을 해줘야 하는 경우에 사용됩니다.
+
+static getDerivedStateFromProps(nextProps, prevState) {
+  // 여기서는 setState 를 하는 것이 아니라
+  // 특정 props 가 바뀔 때 설정하고 설정하고 싶은 state 값을 리턴하는 형태로
+  // 사용됩니다.
+  /*
+  if (nextProps.value !== prevState.value) {
+    return { value: nextProps.value };
+  }
+  return null; // null 을 리턴하면 따로 업데이트 할 것은 없다라는 의미
+  */
+}
+shouldComponentUpdate
+shouldComponentUpdate(nextProps, nextState) {
+  // return false 하면 업데이트를 안함
+  // return this.props.checked !== nextProps.checked
+  return true;
+}
+이 API 는 컴포넌트를 최적화하는 작업에서 매우 유용하게 사용됩니다. 우리가 저번에 배웠을 떄, 리액트에서는 변화가 발생하는 부분만 업데이트를 해줘서 성능이 꽤 잘 나온다고 했었지요? 하지만, 변화가 발생한 부분만 감지해내기 위해서는 Virtual DOM 에 한번 그려줘야합니다.
+
+즉, 현재 컴포넌트의 상태가 업데이트되지 않아도, 부모 컴포넌트가 리렌더링되면, 자식 컴포넌트들도 렌더링 됩니다. 여기서 "렌더링" 된다는건, render() 함수가 호출된다는 의미입니다.
+
+변화가 없으면 물론 DOM 조작은 하지 않게 됩니다. 그저 Virutal DOM 에만 렌더링 할 뿐이죠. 이 작업은 그렇게 부하가 많은 작업은 아니지만, 컴포넌트가 무수히 많이 렌더링된다면 얘기가 조금 달라집니다. CPU 자원을 어느정도 사용하고 있는것은 사실이니까요.
+
+쓸대없이 낭비되고 있는 이 CPU 처리량을 줄여주기 위해서 우리는 Virtual DOM 에 리렌더링 하는것도,불필요할경우엔 방지하기 위해서 shouldComponentUpdate 를 작성합니다.
+
+이 함수는 기본적으로 true 를 반환합니다. 우리가 따로 작성을 해주어서 조건에 따라 false 를 반환하면 해당 조건에는 render 함수를 호출하지 않습니다.
+
+componentWillUpdate
+componentWillUpdate(nextProps, nextState) {
+
+}
+이 API는 shouldComponentUpdate 에서 true 를 반환했을때만 호출됩니다. 만약에 false 를 반환했었다면 이 함수는 호출되지 않습니다. 여기선 주로 애니메이션 효과를 초기화하거나, 이벤트 리스너를 없애는 작업을 합니다. 이 함수가 호출되고난 다음에는, render() 가 호출됩니다. 이 API 또한 v16.3 이후 deprecate 됩니다. 기존의 기능은 getSnapshotBeforeUpdate 로 대체 될 수 있습니다.
+
+[NEW] getSnapshotBeforeUpdate()
+이 API 가 발생하는 시점은 다음과 같습니다.
+
+render()
+getSnapshotBeforeUpdate()
+실제 DOM 에 변화 발생
+componentDidUpdate
+이 API를 통해서, DOM 변화가 일어나기 직전의 DOM 상태를 가져오고, 여기서 리턴하는 값은 componentDidUpdate 에서 3번째 파라미터로 받아올 수 있게 됩니다.
+
+예시코드:
+
+  getSnapshotBeforeUpdate(prevProps, prevState) {
+    // DOM 업데이트가 일어나기 직전의 시점입니다.
+    // 새 데이터가 상단에 추가되어도 스크롤바를 유지해보겠습니다.
+    // scrollHeight 는 전 후를 비교해서 스크롤 위치를 설정하기 위함이고,
+    // scrollTop 은, 이 기능이 크롬에 이미 구현이 되어있는데, 
+    // 이미 구현이 되어있다면 처리하지 않도록 하기 위함입니다.
+    if (prevState.array !== this.state.array) {
+      const {
+        scrollTop, scrollHeight
+      } = this.list;
+
+      // 여기서 반환 하는 값은 componentDidMount 에서 snapshot 값으로 받아올 수 있습니다.
+      return {
+        scrollTop, scrollHeight
+      };
+    }
+  }
+
+  componentDidUpdate(prevProps, prevState, snapshot) {
+    if (snapshot) {
+      const { scrollTop } = this.list;
+      if (scrollTop !== snapshot.scrollTop) return; // 기능이 이미 구현되어있다면 처리하지 않습니다.
+      const diff = this.list.scrollHeight - snapshot.scrollHeight;
+      this.list.scrollTop += diff;
+    }
+  }
+전체코드는 https://codesandbox.io/s/484zvr87ow 에서 확인 하실 수 있습니다.
+
+componentDidUpdate
+componentDidUpdate(prevProps, prevState, snapshot) {
+
+}
+이 API는 컴포넌트에서 render() 를 호출하고난 다음에 발생하게 됩니다. 이 시점에선 this.props 와 this.state 가 바뀌어있습니다. 그리고 파라미터를 통해 이전의 값인 prevProps 와 prevState 를 조회 할 수 있습니다. 그리고, getSnapshotBeforeUpdate 에서 반환한 snapshot 값은 세번째 값으로 받아옵니다.
+
+컴포넌트 제거
+컴포넌트가 더 이상 필요하지 않게 되면 단 하나의 API 가 호출됩니다:
+
+componentWillUnmount
+componentWillUnmount() {
+  // 이벤트, setTimeout, 외부 라이브러리 인스턴스 제거
+}
+여기서는 주로 등록했었던 이벤트를 제거하고, 만약에 setTimeout 을 걸은것이 있다면 clearTimeout 을 통하여 제거를 합니다. 추가적으로, 외부 라이브러리를 사용한게 있고 해당 라이브러리에 dispose 기능이 있다면 여기서 호출해주시면 됩니다.
+
+직접 사용해보기
+기존에 우리가 만들었던 카운터에 LifeCycle API 를 작성해보겠습니다. Counter.js 를 다음과 같이 수정해보세요.
+
+import React, { Component } from 'react';
+
+class Counter extends Component {
+  state = {
+    number: 0
+  }
+
+  constructor(props) {
+    super(props);
+    console.log('constructor');
+  }
+
+  componentWillMount() {
+    console.log('componentWillMount (deprecated)');
+  }
+
+  componentDidMount() {
+    console.log('componentDidMount');
+  }
+
+  shouldComponentUpdate(nextProps, nextState) {
+    // 5 의 배수라면 리렌더링 하지 않음
+    console.log('shouldComponentUpdate');
+    if (nextState.number % 5 === 0) return false;
+    return true;
+  }
+
+  componentWillUpdate(nextProps, nextState) {
+    console.log('componentWillUpdate');
+  }
+
+  componentDidUpdate(prevProps, prevState) {
+    console.log('componentDidUpdate');
+  }
+
+
+  handleIncrease = () => {
+    const { number } = this.state;
+    this.setState({
+      number: number + 1
+    });
+  }
+
+  handleDecrease = () => {
+    this.setState(
+      ({ number }) => ({
+        number: number - 1
+      })
+    );
+  }
+
+  render() {
+    console.log('render');
+    return (
+      <div>
+        <h1>카운터</h1>
+        <div>값: {this.state.number}</div>
+        <button onClick={this.handleIncrease}>+</button>
+        <button onClick={this.handleDecrease}>-</button>
+      </div>
+    );
+  }
+}
+
+export default Counter;
+
+
+콘솔에 찍히는 메시지들을 확인해보세요. 그리고 5의 배수일때는 컴포넌트가 리렌더링 되지 않는 것도 확인하세요.
+
+컴포넌트에 에러 발생
+render 함수에서 에러가 발생한다면, 리액트 앱이 크래쉬 되어버립니다. 그러한 상황에 유용하게 사용 할 수 있는 API 가 한가지 있는데 한번 알아봅시다!
+
+componentDidCatch
+componentDidCatch(error, info) {
+  this.setState({
+    error: true
+  });
+}
+에러가 발생하면 이런식으로 componentDidCatch 가 실행되게 하고, state.error 를 true 로 설정하게 하고, render 함수쪽에서 이에 따라 에러를 띄워주시면 됩니다.
+
+이 API 를 사용하시게 될 때 주의하실 점이 있는데요, 컴포넌트 자신의 render 함수에서 에러가 발생해버리는것은 잡아낼 수는 없지만, 그 대신에 컴포넌트의 자식 컴포넌트 내부에서 발생하는 에러들을 잡아낼 수 있습니다
+
+일단 문제가 발생하는 코드를 작성해봅시다!
+
+import React, { Component } from 'react';
+
+const Problematic = () => {
+  throw (new Error('버그가 나타났다!'));
+  return (
+    <div>
+
+    </div>
+  );
+};
+
+class Counter extends Component {
+  // ... 생략
+
+  render() {
+    return (
+      <div>
+        <h1>카운터</h1>
+        <div>값: {this.state.number}</div>
+        { this.state.number === 4 && <Problematic /> }
+        <button onClick={this.handleIncrease}>+</button>
+        <button onClick={this.handleDecrease}>-</button>
+      </div>
+    );
+  }
+}
+
+export default Counter;
+Problematic 이라는 컴포넌트를 만들고 이 값이 4가 되면 렌더링을 하도록 설정했습니다. Problematic 은 렌더링이 될 때 에러가 발생했음을 알리는 throw 를 사용하게끔 했는데요, 한번 카운터 값이 4까지 올라갔을때 어떻게 되는지 확인해보겠습니다.
+
+
+
+여기서 이렇게 빨갛게 Error: 버그가 나타났다! 라고 뜨는 부분은 개발모드에서 제공해주는 기능입니다. 프로덕션에선 이 화면은 나타나지 않습니다. 여기서 X 를 눌러보시면,
+
+
+
+그냥 비어있는 페이지가 나타납니다.
+
+자, 그럼 componentDidCatch 를 통하여 자식 컴포넌트에서 발생한 에러를 잡아보겠습니다.
+
+import React, { Component } from 'react';
+
+const Promblematic = () => {
+  throw (new Error('버그가 나타났다!'));
+  return (
+    <div>
+
+    </div>
+  );
+};
+
+class Counter extends Component {
+  state = {
+    number: 0,
+    error: false
+  }
+
+  // (...)
+
+  componentDidCatch(error, info) {
+    this.setState({
+      error: true
+    });
+  }
+
+  render() {
+    if (this.state.error) return (<h1>에러발생!</h1>);
+
+    return (
+      <div>
+        <h1>카운터</h1>
+        <div>값: {this.state.number}</div>
+        { this.state.number === 4 && <Promblematic /> }
+        <button onClick={this.handleIncrease}>+</button>
+        <button onClick={this.handleDecrease}>-</button>
+      </div>
+    );
+  }
+}
+
+export default Counter;
+이젠 어떻게되나 볼까요?
+
+다시 카운터를 4로 올리면, 빨간 에러창은 여전히 뜨게 됩니다. 하지만 X 를 눌렀을 때, 앱이 크래쉬되는 것이 아니라 에러가 발생했다는 메시지가 뜨게 됩니다.
+
+
+
+보통, 렌더링 부분에서 오류가 발생하는것은 사전에 방지해주어야 합니다. 주로 자주 에러가 발생하는 이유는 다음과 같습니다:
+
+존재하지 않는 함수를 호출하려고 할 때 (예를들어서 props 로 받았을줄 알았던 함수가 전달되지 않았을때)
+this.props.onClick();
+배열이나 객체가 올 줄 알았는데, 해당 객체나 배열이 존재하지 않을때
+this.props.object.value; // object is undefined
+this.props.array.length; // array is undefined
+이러한 것들은 render 함수에서 다음과 같은 형식으로 막아 줄 수 있습니다.
+
+render() {
+  if (!this.props.object || !this.props.array || this.props.array.length ===0) return null;
+  // object 나 array 를 사용하는 코드
+}
+혹은, 우리가 이전에 배웠었던 컴포넌트의 기본값을 설정하는 defaultProps를 통해서 설정하면됩니다.
+
+class Sample extends Component {
+  static defaultProps = {
+    onIncrement: () => console.warn('onIncrement is not defined'),
+    object: {},
+    array: []
+  }
+}
+하지만 이걸로도! 놓쳐버린 버그들은 componentDidCatch 를 통해서 잡아주고, 필요시엔 에러의 세부내용을 서버쪽에 기록하게해서 조사해보면 되겠지요?
+
+정리
+리액트 컴포넌트가 사용될 때 각 상황에 따라 호출되는 LifeCycle API 에 대해서 알아보았습니다. 이 API 들은 알아두면 여러상황에 유용하게 쓸 수 있으니, 어떠한 API 들이 있는지 인지해두시고, 나중에 해결해야 할 문제가 있을 때 사용하면 되겠습니다.
+
+다음 섹션에서는 state 와 props 를 사용하여 컴포넌트간의 데이터 교류와 조금 더 복잡한 상태관리를 다뤄보겠습니다.
